@@ -2,7 +2,7 @@
 
 /* global qrcode */
 import { makeCode, zoneOf, clamp01, cleanName, fmtTime, store, cssVar, hexA, keepAwake, fitCanvas, dpr, makeId, NEUTRAL_HALF } from './shared.js';
-import { HostNet } from './net.js';
+import { HostNet, relayConfigured } from './net.js';
 import { Replayer, computeStats, tallyOf, tallyAt, EV_MOVE, EV_JOIN, EV_GONE } from './stats.js';
 
 const $ = (id) => document.getElementById(id);
@@ -228,8 +228,10 @@ function renderStatus() {
     return;
   }
   const conn = net ? net.size : 0;
+  const relayed = net ? net.relayed : 0;
+  const relayNote = !relayConfigured() ? ' · no relay server (phones on mobile data can’t join)' : relayed ? ` (${relayed} via relay)` : '';
   const map = {
-    online: ['ok', `Live · room ${S.code} · ${conn} phone${conn === 1 ? '' : 's'} connected`],
+    online: [relayConfigured() ? 'ok' : 'warn', `Live · room ${S.code} · ${conn} phone${conn === 1 ? '' : 's'} connected${relayNote}`],
     reconnecting: ['warn', `Reconnecting… phones already in keep working`],
     taken: ['warn', `Waiting for room ${S.code} to free up (is it open in another tab?)`],
     nowebrtc: ['bad', 'This browser cannot host a room (no WebRTC)'],

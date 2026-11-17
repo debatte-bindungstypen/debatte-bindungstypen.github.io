@@ -1,15 +1,75 @@
 // Realtime layer. GitHub Pages only serves static files, so the presenter's
 // browser acts as the "server": phones open a WebRTC data channel straight to it.
-// PeerJS's free cloud broker is only used to introduce the two sides; it also
-// ships public TURN relays for networks where a direct connection is blocked.
+// PeerJS's free cloud broker only introduces the two sides. When a direct
+// connection is impossible (mobile data, university Wi-Fi), the data goes through
+// the relay ("TURN") server configured in config.js.
 //
 // Everything network-specific lives in this file, so the transport can be
 // swapped (e.g. for Firebase) without touching the app code.
 
 /* global Peer */
 import { hostPeerId } from './shared.js';
+import { RELAY } from './config.js';
 
-const PEER_OPTS = { debug: 0 };
+const STUN = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+const params = new URLSearchParams(location.search);
+// ?relayonly — testing: force every connection through the relay, as on mobile data.
+const RELAY_ONLY = params.has('relayonly');
+
+export function relayConfigured() {
+  return !!((RELAY.meteredApp && RELAY.meteredApiKey) || (RELAY.iceServers || []).some((s) => /turns?:/.test(String(s.urls))));
+}
+
+let icePromise = null;
+/** STUN + relay servers. Metered credentials are fetched once per page load. */
+export function loadIceServers() {
+  if (icePromise) return icePromise;
+  icePromise = (async () => {
+    const list = [...STUN, ...(RELAY.iceServers || [])];
+    let ok = true;
+    if (RELAY.meteredApp && RELAY.meteredApiKey) {
+      ok = false;
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 6000);
+        const url = `https://${encodeURIComponent(RELAY.meteredApp)}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(RELAY.meteredApiKey)}`;
+        const res = await fetch(url, { signal: ctrl.signal });
+        clearTimeout(timer);
+        const servers = res.ok ? await res.json() : null;
+        if (Array.isArray(servers) && servers.length) {
+          list.push(...servers);
+          ok = true;
+        }
+      } catch {}
+    }
+    if (!ok) icePromise = null; // try again on the next (re)connect
+    return list;
+  })();
+  return icePromise;
+}
+
+async function peerOptions() {
+  const iceServers = await loadIceServers();
+  return { debug: 0, config: { iceServers, ...(RELAY_ONLY ? { iceTransportPolicy: 'relay' } : {}) } };
+}
+
+/** 'direct' | 'relay' | null — how an open connection actually travels. */
+async function pathOf(pc) {
+  if (!pc?.getStats) return null;
+  const stats = await pc.getStats();
+  let pair = null;
+  stats.forEach((s) => {
+    if (s.type === 'transport' && s.selectedCandidatePairId) pair = stats.get(s.selectedCandidatePairId);
+  });
+  if (!pair)
+    stats.forEach((s) => {
+      if (s.type === 'candidate-pair' && s.nominated && s.state === 'succeeded') pair = s;
+    });
+  if (!pair) return null;
+  const l = stats.get(pair.localCandidateId);
+  const r = stats.get(pair.remoteCandidateId);
+  return l?.candidateType === 'relay' || r?.candidateType === 'relay' ? 'relay' : 'direct';
+}
 
 export class HostNet {
   /**
@@ -20,22 +80,27 @@ export class HostNet {
     this.code = code;
     this.h = h;
     this.conns = new Map(); // connectionId -> DataConnection
+    this.via = new Map(); // connectionId -> 'direct' | 'relay'
     this.peer = null;
     this.dead = false;
     this.health = null;
   }
 
-  start() {
+  async start() {
     this.dead = false;
+    this.opts = await peerOptions();
+    if (this.dead) return;
     this._spawn();
     // Health check: if we lost the broker, reconnect; if the peer died before it
     // ever registered (e.g. room code still held by a closing tab), start over.
     // Already-connected phones talk to us directly and keep working meanwhile.
-    this.health = setInterval(() => {
+    this.health = setInterval(async () => {
       if (this.dead) return;
       const p = this.peer;
-      if (!p || p.destroyed) this._spawn();
-      else if (p.disconnected) {
+      if (!p || p.destroyed) {
+        this.opts = await peerOptions(); // retries the relay lookup if it failed
+        if (!this.dead) this._spawn();
+      } else if (p.disconnected) {
         try {
           p.reconnect();
         } catch {
@@ -50,7 +115,7 @@ export class HostNet {
       this.h.onError?.('browser');
       return;
     }
-    const peer = new Peer(hostPeerId(this.code), PEER_OPTS);
+    const peer = new Peer(hostPeerId(this.code), this.opts);
     this.peer = peer;
     peer.on('open', () => {
       if (this.peer !== peer) return;
@@ -76,6 +141,7 @@ export class HostNet {
     const cid = conn.connectionId;
     let opened = false;
     const gone = () => {
+      this.via.delete(cid);
       if (!this.conns.has(cid)) return;
       this.conns.delete(cid);
       this.h.onDisconnect?.(cid);
@@ -84,6 +150,15 @@ export class HostNet {
       opened = true;
       this.conns.set(cid, conn);
       this.h.onConnect?.(cid);
+      // Find out whether this phone came in directly or through the relay.
+      for (const ms of [2500, 12000]) {
+        setTimeout(() => {
+          if (!this.conns.has(cid)) return;
+          pathOf(conn.peerConnection)
+            .then((p) => p && this.conns.has(cid) && this.via.set(cid, p))
+            .catch(() => {});
+        }, ms);
+      }
     });
     conn.on('data', (d) => {
       if (!opened) return;
@@ -107,6 +182,7 @@ export class HostNet {
   close(cid) {
     const c = this.conns.get(cid);
     this.conns.delete(cid);
+    this.via.delete(cid);
     try {
       c?.close();
     } catch {}
@@ -116,6 +192,12 @@ export class HostNet {
     return this.conns.size;
   }
 
+  get relayed() {
+    let n = 0;
+    for (const v of this.via.values()) if (v === 'relay') n++;
+    return n;
+  }
+
   destroy() {
     this.dead = true;
     clearInterval(this.health);
@@ -123,6 +205,7 @@ export class HostNet {
       this.peer?.destroy();
     } catch {}
     this.conns.clear();
+    this.via.clear();
   }
 }
 
@@ -139,19 +222,24 @@ export class ClientNet {
     this.conn = null;
     this.attempt = 0;
     this.lastRx = 0;
+    this.lastOk = Date.now(); // last time we were connected (or started trying)
     this.retryTimer = null;
     this.status = 'idle';
     this.stopped = false;
+    this.via = null;
   }
 
-  start() {
+  async start() {
     if (typeof Peer === 'undefined') {
       this._set('unsupported');
       return;
     }
+    this._set('connecting');
+    this.opts = await peerOptions();
     this._ensure();
     // Watchdog: the host talks at least once a second. Silence means the link is dead.
     this.watch = setInterval(() => {
+      if (this.status === 'connected') this.lastOk = Date.now();
       if (this.status === 'connected' && Date.now() - this.lastRx > 9000) this._drop();
     }, 1500);
     document.addEventListener('visibilitychange', () => {
@@ -165,6 +253,11 @@ export class ClientNet {
       this.attempt = 0;
       if (this.status !== 'connected') this._ensure();
     });
+  }
+
+  /** Milliseconds since we last had a working connection. */
+  get downFor() {
+    return this.status === 'connected' ? 0 : Date.now() - this.lastOk;
   }
 
   stop() {
@@ -181,11 +274,12 @@ export class ClientNet {
 
   _set(s) {
     if (this.status === s) return;
+    if (this.status === 'connected') this.lastOk = Date.now();
     this.status = s;
     this.h.onStatus?.(s);
   }
 
-  _ensure() {
+  async _ensure() {
     if (this.stopped) return;
     const p = this.peer;
     if (p && !p.destroyed) {
@@ -204,7 +298,9 @@ export class ClientNet {
       }
     }
     if (this.status !== 'reconnecting' && this.status !== 'notfound') this._set('connecting');
-    const peer = new Peer(PEER_OPTS);
+    this.opts = await peerOptions(); // cached; re-fetches only if the relay lookup failed
+    if (this.stopped) return;
+    const peer = new Peer(this.opts);
     this.peer = peer;
     peer.on('open', () => this._connect());
     peer.on('disconnected', () => {
@@ -236,6 +332,9 @@ export class ClientNet {
       this.lastRx = Date.now();
       this._set('connected');
       this.h.onOpen?.();
+      setTimeout(() => {
+        if (this.conn === c) pathOf(c.peerConnection).then((p) => (this.via = p)).catch(() => {});
+      }, 2500);
     });
     c.on('data', (d) => {
       if (this.conn !== c) return;

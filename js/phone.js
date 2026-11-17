@@ -114,7 +114,7 @@ function start() {
   disp.x = me.x;
   disp.y = me.y;
   idStore.set(key, me);
-  history.replaceState(null, '', `?room=${code}${fresh ? '&fresh' : ''}`);
+  history.replaceState(null, '', `?room=${code}${fresh ? '&fresh' : ''}${params.has('relayonly') ? '&relayonly' : ''}`);
 
   show('mainView');
   $('pName').textContent = name;
@@ -132,6 +132,16 @@ function start() {
 
   setInterval(() => {
     if (Date.now() - lastSent > 3500 && net.send({ t: 'ping' })) lastSent = Date.now();
+    // Stuck for a while? Tell people what usually helps.
+    const stuck = net.status !== 'connected' && net.status !== 'unsupported' && net.downFor > 15000;
+    const hint = $('pHint');
+    if (stuck && hint.hidden) {
+      hint.textContent =
+        net.status === 'notfound'
+          ? `Room ${code} isn't open right now. Check the code on the big screen.`
+          : "Can't reach the big screen. Try switching between Wi-Fi and mobile data. Your choice is kept and sent as soon as you're connected.";
+    }
+    hint.hidden = !stuck;
   }, 1000);
 }
 

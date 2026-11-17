@@ -7,9 +7,21 @@ Everything is static files, so it runs on **GitHub Pages**. No server or account
 ## How it works
 
 - `host.html` (big screen) is the "server". The presenter's browser keeps the session and talks to every phone directly over WebRTC.
-- The free [PeerJS](https://peerjs.com) cloud broker only introduces phones to the big screen. PeerJS also ships public TURN relays, used when a direct connection is blocked.
+- The free [PeerJS](https://peerjs.com) cloud broker only introduces phones to the big screen.
+- Phones on the same Wi-Fi as the laptop can usually connect directly. **Phones on mobile data or on university Wi-Fi need a relay ("TURN") server**, set in `js/config.js` (see below).
 - Phones send their position about 14 times per second while dragging. The big screen sends back the crowd and the tally once per second.
 - Everything is autosaved in the presenter's browser. If the big-screen tab reloads, choose **Resume room**: you get the same code, and phones reconnect by themselves.
+
+## Set up the relay (required for mobile data and university Wi-Fi)
+
+The relays that PeerJS used to provide have been shut down, and there is no free public relay without an account any more. Without a relay, only phones on the same Wi-Fi as the laptop can join. The big screen's status line then says "no relay server".
+
+1. Create a free account for Metered's [Open Relay](https://www.metered.ca/tools/openrelay/). It includes 20 GB a month and works through strict firewalls on ports 80 and 443. A one-hour talk with 150 people uses well under 1 GB.
+2. In the Metered dashboard, find your app name (the part before `.metered.live`) and your API key.
+3. Put both into `js/config.js` (`meteredApp` and `meteredApiKey`) and upload that file.
+4. Test with `join.html?room=CODE&relayonly`. It forces the relay, like a phone on mobile data would need. The big screen then shows "1 phone connected (1 via relay)".
+
+Anything in `config.js` is visible to visitors of the site. At worst, someone uses up your free allowance.
 
 ## Publish on GitHub Pages
 
@@ -61,7 +73,7 @@ gh api -X POST repos/{owner}/debate-floor/pages -f "source[branch]=main" -f "sou
 
 - **Keep the big-screen tab open** during the talk. You can switch to your slides (Cmd/Alt-Tab), and the vote keeps recording in the background. If the tab is closed, phones wait and reconnect when you reopen it and choose **Resume room**.
 - **Audience size:** about 150 phones works comfortably on a normal laptop. Beyond about 200, consider a dedicated realtime backend; only `js/net.js` would need to change.
-- **Strict networks:** some corporate or university Wi-Fi blocks peer-to-peer traffic. The PeerJS TURN relays usually get around this. If the venue is very locked down, ask the audience to use mobile data.
+- **Strict networks:** university Wi-Fi usually blocks devices from talking to each other directly, so phones there go through the relay. The Metered relay also runs on port 443, the normal web port, so it works anywhere websites load.
 - **Privacy:** names and positions go only from phones to the presenter's browser. Nothing is stored on a server.
 - **Testing locally:** run `python3 -m http.server 8765` in this folder and open `http://localhost:8765/host.html`. The QR code points to `localhost`, so real phones can't use it. Deploy to GitHub Pages to test with phones.
 
@@ -72,6 +84,7 @@ gh api -X POST repos/{owner}/debate-floor/pages -f "source[branch]=main" -f "sou
 | `index.html` | Landing page: join with a code, or open the big screen |
 | `host.html`, `js/host.js` | Big screen: floor, tally, timeline, replay, results, settings |
 | `join.html`, `js/phone.js` | Phone view |
+| `js/config.js` | Relay (TURN) server settings: fill this in |
 | `js/net.js` | Realtime layer (PeerJS / WebRTC). Swap this file to change the transport |
 | `js/stats.js` | Replay engine, switches, travel, time per side, awards |
 | `js/shared.js` | Shared helpers |

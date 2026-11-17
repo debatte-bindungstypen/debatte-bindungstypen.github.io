@@ -1057,6 +1057,14 @@ body.phone {
   white-space: nowrap;
   padding-top: 3px;
 }
+.p-hint {
+  background: color-mix(in srgb, #f5c211 18%, var(--panel));
+  border: 1px solid color-mix(in srgb, #f5c211 50%, var(--line));
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
 .p-sides {
   display: grid;
   grid-template-columns: 1fr 1fr;
