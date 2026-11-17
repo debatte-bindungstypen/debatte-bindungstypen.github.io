@@ -2,7 +2,7 @@
 
 /* global qrcode */
 import { makeCode, zoneOf, clamp01, cleanName, fmtTime, store, cssVar, hexA, keepAwake, fitCanvas, dpr, makeId, NEUTRAL_HALF } from './shared.js';
-import { HostNet, relayConfigured } from './net.js';
+import { HostNet } from './net.js';
 import { Replayer, computeStats, tallyOf, tallyAt, EV_MOVE, EV_JOIN, EV_GONE } from './stats.js';
 
 const $ = (id) => document.getElementById(id);
@@ -210,7 +210,7 @@ function startNet(isResume) {
       const p = pid && live.get(pid);
       if (p && p.cid === cid) p.cid = null;
     },
-  });
+  }, { resume: isResume });
   net.start();
 }
 
@@ -228,10 +228,9 @@ function renderStatus() {
     return;
   }
   const conn = net ? net.size : 0;
-  const relayed = net ? net.relayed : 0;
-  const relayNote = !relayConfigured() ? ' · no relay server (phones on mobile data can’t join)' : relayed ? ` (${relayed} via relay)` : '';
   const map = {
-    online: [relayConfigured() ? 'ok' : 'warn', `Live · room ${S.code} · ${conn} phone${conn === 1 ? '' : 's'} connected${relayNote}`],
+    online: [net?.degraded ? 'warn' : 'ok', `Live · room ${S.code} · ${conn} phone${conn === 1 ? '' : 's'} connected${net?.note || ''}`],
+    denied: ['bad', 'The database refused access — check the Firebase rules (see README)'],
     reconnecting: ['warn', `Reconnecting… phones already in keep working`],
     taken: ['warn', `Waiting for room ${S.code} to free up (is it open in another tab?)`],
     nowebrtc: ['bad', 'This browser cannot host a room (no WebRTC)'],

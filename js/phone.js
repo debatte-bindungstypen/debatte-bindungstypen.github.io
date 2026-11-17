@@ -114,6 +114,7 @@ function start() {
   disp.x = me.x;
   disp.y = me.y;
   idStore.set(key, me);
+  idStore.set('df:name', name);
   history.replaceState(null, '', `?room=${code}${fresh ? '&fresh' : ''}${params.has('relayonly') ? '&relayonly' : ''}`);
 
   show('mainView');
@@ -192,6 +193,7 @@ function setConn(s) {
     notfound: ['bad', 'room not found'],
     offline: ['bad', 'offline'],
     unsupported: ['bad', 'not supported'],
+    denied: ['bad', 'no access'],
   };
   const [cls, txt] = map[s] || ['warn', s];
   $('connDot').className = 'dot-status ' + cls;
@@ -229,7 +231,7 @@ function applyCfg(c) {
 /* ---------------- moving ---------------- */
 
 function save() {
-  idStore.set('df:p:' + code, me);
+  if (me.pid) idStore.set('df:p:' + code, me);
 }
 
 function sendPos() {
