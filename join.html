@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0e14" />
+    <title>Join the debate</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  </head>
+  <body class="phone">
+    <!-- 1. enter name (and code, if not in the link) -->
+    <section id="joinView" class="p-view p-join" hidden>
+      <div class="eyebrow">Debate Floor</div>
+      <h1>Take a side.</h1>
+      <div class="room" id="roomLine" hidden>Room <b id="roomCode"></b></div>
+      <label id="codeField" hidden>
+        <span>Room code (on the big screen)</span>
+        <input id="codeInput" class="code-input" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+      </label>
+      <label>
+        <span>Your name</span>
+        <input id="nameInput" maxlength="24" autocomplete="nickname" enterkeyhint="go" placeholder="e.g. Sophie" />
+      </label>
+      <button id="joinBtn" class="btn primary">Join</button>
+      <p class="fine">Your name is shown next to your dot on the big screen and in the results.</p>
+    </section>
+
+    <!-- 2. the floor -->
+    <section id="mainView" class="p-main" hidden>
+      <header class="p-top">
+        <div class="p-q" id="pQ">Connecting…</div>
+        <div class="p-conn"><span class="dot-status warn" id="connDot"></span><span id="connText">connecting</span></div>
+      </header>
+      <div class="p-sides"><span class="a" id="pA">Side A</span><span class="b" id="pB">Side B</span></div>
+      <div class="p-floor-wrap">
+        <canvas id="pFloor" aria-label="Debate floor. Drag your dot left or right to take a side."></canvas>
+        <div class="p-locked" id="pLocked" hidden>Voting is paused</div>
+      </div>
+      <div class="p-stance" id="pStance">Drag your dot to take a side</div>
+      <div class="p-btns">
+        <button class="btn a" data-go="a">‹ <span id="btnA">A</span></button>
+        <button class="btn" data-go="u" id="btnU">Undecided</button>
+        <button class="btn b" data-go="b"><span id="btnB">B</span> ›</button>
+      </div>
+      <div class="p-me">You are <b id="pName"></b> · <button class="link" id="renameBtn">change name</button></div>
+    </section>
+
+    <!-- 3. messages (removed, opened elsewhere, unsupported) -->
+    <section id="msgView" class="p-view p-msg" hidden>
+      <div>
+        <h1 id="msgTitle"></h1>
+        <p class="muted" id="msgText"></p>
+        <button class="btn" id="msgBtn" hidden>Try again</button>
+      </div>
+    </section>
+
+    <div id="toast"></div>
+    <script type="module" src="js/phone.js"></script>
+  </body>
+</html>

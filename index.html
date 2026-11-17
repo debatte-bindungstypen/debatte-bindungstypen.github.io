@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Debate Floor</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script>
+      // Someone typed the short URL plus ?room=… — send them straight to the phone view.
+      const r = new URLSearchParams(location.search).get('room');
+      if (r) location.replace('join.html?room=' + encodeURIComponent(r));
+    </script>
+  </head>
+  <body>
+    <main class="landing">
+      <div class="landing-inner">
+        <div class="eyebrow">Live audience vote</div>
+        <h1><span class="a">Take</span> a <span class="b">side.</span></h1>
+        <p class="lead">The audience joins on their phones, then stands on one side of a virtual floor — and moves whenever the debaters change their mind. The big screen shows the room live, records how it shifts, and replays it at the end.</p>
+        <div class="cards">
+          <form class="card" id="joinForm">
+            <h2>Join a debate</h2>
+            <p>Enter the code shown on the big screen.</p>
+            <div class="row">
+              <input id="code" class="code-input" maxlength="6" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code" />
+              <button class="btn primary" type="submit">Join</button>
+            </div>
+          </form>
+          <div class="card">
+            <h2>Present</h2>
+            <p>Open the big-screen view on the laptop connected to the projector. It creates a room with a QR code.</p>
+            <a class="btn" href="host.html">Open the big screen</a>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script>
+      const input = document.getElementById('code');
+      input.addEventListener('input', () => (input.value = input.value.toUpperCase().replace(/[^A-Z]/g, '')));
+      document.getElementById('joinForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (input.value.length >= 4) location.href = 'join.html?room=' + input.value;
+        else input.focus();
+      });
+    </script>
+  </body>
+</html>

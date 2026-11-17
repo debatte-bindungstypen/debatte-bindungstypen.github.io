@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Debate Floor — big screen</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  </head>
+  <body class="host">
+    <div class="host-app" id="app">
+      <header class="h-top">
+        <div class="h-title">
+          <div class="eyebrow"><span class="dot-status warn" id="statusDot"></span><span id="statusText">starting…</span></div>
+          <h1 id="question">Which side are you on?</h1>
+        </div>
+        <button class="join-chip" id="joinChip" title="Show join screen (Q)">
+          <canvas id="qrSmall" width="184" height="184"></canvas>
+          <div>
+            <div class="chip-url" id="chipUrl"></div>
+            <div class="chip-code" id="chipCode">····</div>
+          </div>
+        </button>
+      </header>
+
+      <section class="tally" aria-live="polite">
+        <div class="tally-side a"><span class="tpct" id="pctA">0%</span><span class="tname" id="nameA">Side A</span></div>
+        <div class="tally-mid">
+          <div class="tally-bar"><div class="seg a" id="segA"></div><div class="seg u" id="segU"></div><div class="seg b" id="segB"></div></div>
+          <div class="tally-sub"><span id="subU"></span><span id="subN">0 people</span></div>
+        </div>
+        <div class="tally-side b"><span class="tname" id="nameB">Side B</span><span class="tpct" id="pctB">0%</span></div>
+      </section>
+
+      <main class="floor-wrap" id="floorWrap">
+        <canvas id="floor"></canvas>
+        <div class="floor-hint" id="floorHint">Scan the code to join — your dot appears here.</div>
+        <div class="badge" id="modeBadge" hidden>Replay</div>
+        <div class="dot-pop" id="dotPop" hidden>
+          <div class="name" id="popName"></div>
+          <div class="meta" id="popMeta"></div>
+          <div class="row">
+            <button class="btn" id="popPath">Show path</button>
+            <button class="btn danger" id="popKick">Remove</button>
+          </div>
+        </div>
+      </main>
+
+      <section class="timeline-wrap" title="Opinion over time — click to replay from that moment">
+        <canvas id="timeline"></canvas>
+      </section>
+
+      <footer class="controls" id="controls">
+        <!-- live controls -->
+        <div class="row" id="liveCtl">
+          <button class="btn" id="btnMark" title="Mark this moment on the timeline (M)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21V4h11l-2 4 2 4H5" /></svg>Mark moment
+          </button>
+          <button class="btn" id="btnLock" title="Freeze everyone's position (L)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg><span>Lock voting</span>
+          </button>
+          <button class="btn" id="btnReplay" title="Replay the debate (R)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>Replay
+          </button>
+          <button class="btn" id="btnResults" title="Results & awards (S)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>Results
+          </button>
+        </div>
+        <!-- replay controls -->
+        <div class="row" id="replayCtl" hidden>
+          <button class="btn primary" id="btnPlay" title="Play / pause (Space)">Play</button>
+          <div class="speed" id="speed">
+            <button data-s="1">1×</button><button data-s="4">4×</button><button data-s="10" class="on">10×</button><button data-s="30">30×</button>
+          </div>
+          <button class="btn" id="btnExitReplay">Back to live</button>
+          <button class="btn" id="btnResults2">Results</button>
+        </div>
+        <span class="clock" id="clock">0:00</span>
+        <div class="spacer"></div>
+        <button class="btn ghost" id="btnNames" title="Names on/off (N)">Names</button>
+        <button class="btn ghost" id="btnHeat" title="Heatmap on/off (H)">Heatmap</button>
+        <button class="btn ghost" id="btnFull" title="Fullscreen (F)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+        </button>
+        <button class="btn ghost" id="btnSettings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
+        </button>
+      </footer>
+    </div>
+
+    <!-- big join screen -->
+    <div class="overlay" id="joinOverlay" hidden>
+      <div class="join-card">
+        <canvas id="qrBig" width="900" height="900"></canvas>
+        <div>
+          <div class="eyebrow">Scan to join · or open</div>
+          <div class="big-url" id="bigUrl"></div>
+          <div class="eyebrow" style="margin-top: 1.2em">Room code</div>
+          <div class="big-code" id="bigCode">····</div>
+          <h2 id="bigQuestion"></h2>
+          <div class="joined"><b id="joinedCount">0</b> joined</div>
+          <div class="name-cloud" id="nameCloud"></div>
+          <button class="btn primary" id="btnStart" style="font-size: 1.1rem; padding: 0.8em 1.4em">Show the floor</button>
+          <span class="muted" style="margin-left: 10px">or press Q</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- resume or start -->
+    <div class="overlay" id="startOverlay" hidden>
+      <div class="modal">
+        <h2>Pick up where you left off?</h2>
+        <p id="resumeText"></p>
+        <div class="row">
+          <button class="btn primary" id="btnResume">Resume room</button>
+          <button class="btn" id="btnNewRoom">Start a new room</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- results -->
+    <div class="overlay" id="resultsOverlay" hidden>
+      <div class="results">
+        <div class="results-head">
+          <div>
+            <div class="eyebrow" id="resEyebrow">Results</div>
+            <h2 id="resQuestion"></h2>
+          </div>
+          <div class="row">
+            <button class="btn" id="btnCsv">Export CSV</button>
+            <button class="btn" id="btnJson">Save session</button>
+            <button class="btn primary" id="btnCloseResults">Close</button>
+          </div>
+        </div>
+        <div class="shift" id="shift"></div>
+        <div class="net-shift" id="netShift"></div>
+        <div class="awards" id="awards"></div>
+        <div class="table-tools">
+          <input type="search" id="search" placeholder="Find a name…" />
+          <span class="muted" id="tableNote">Click a person to show their path on the floor.</span>
+        </div>
+        <div class="table-scroll">
+          <table class="people">
+            <thead>
+              <tr id="thead"></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- mark a moment -->
+    <div class="mark-pop" id="markPop" hidden>
+      <div class="eyebrow" style="margin-bottom: 8px">Mark this moment</div>
+      <div class="row">
+        <input id="markInput" placeholder="e.g. After opening statements" maxlength="40" />
+        <button class="btn primary" id="markOk">Add</button>
+      </div>
+      <div class="chips" id="markChips"></div>
+    </div>
+
+    <!-- settings -->
+    <aside class="drawer" id="settings" aria-label="Settings">
+      <h2>Settings <button class="btn ghost" id="btnCloseSettings">Close</button></h2>
+
+      <label class="field"><span>Question / motion</span><input id="setQ" maxlength="140" /></label>
+      <div class="sides-fields">
+        <label class="field a"><span>Left side</span><input id="setA" maxlength="28" /></label>
+        <label class="field b"><span>Right side</span><input id="setB" maxlength="28" /></label>
+      </div>
+
+      <h3>Floor</h3>
+      <label class="toggle"><span>Undecided zone<small>A neutral strip in the middle</small></span><input type="checkbox" id="setNeutral" /></label>
+      <label class="toggle"><span>Names on the big screen</span><input type="checkbox" id="setNames" /></label>
+      <label class="toggle"><span>Heatmap<small>Glow where people crowd together</small></span><input type="checkbox" id="setHeat" /></label>
+      <label class="toggle"><span>Show the crowd on phones<small>Off = no herding: people only see their own dot</small></span><input type="checkbox" id="setCrowd" /></label>
+      <label class="toggle"><span>Join QR in the corner</span><input type="checkbox" id="setChip" /></label>
+      <label class="toggle"><span>Light theme<small>Often easier to read on projectors</small></span><input type="checkbox" id="setLight" /></label>
+
+      <h3>Rehearsal</h3>
+      <div class="btn-grid">
+        <button class="btn" id="btnBots">Add 12 test people</button>
+        <button class="btn" id="btnNoBots">Remove test people</button>
+      </div>
+
+      <h3>Data</h3>
+      <div class="btn-grid">
+        <button class="btn" id="btnSave">Save session file</button>
+        <button class="btn" id="btnLoad">Open session file</button>
+        <button class="btn" id="btnCsv2">Export CSV</button>
+        <button class="btn danger" id="btnReset">New room…</button>
+      </div>
+      <input type="file" id="fileInput" accept="application/json,.json" hidden />
+      <p class="muted" style="font-size: 0.85rem">Everything is autosaved in this browser. If you reload this tab, you can resume the same room and phones reconnect by themselves.</p>
+
+      <h3>Keyboard</h3>
+      <div class="kbd-list">
+        <kbd>Q</kbd><span>Join screen</span> <kbd>M</kbd><span>Mark moment</span> <kbd>L</kbd><span>Lock / unlock voting</span> <kbd>R</kbd><span>Replay</span> <kbd>Space</kbd><span>Play / pause replay</span> <kbd>S</kbd><span>Results</span> <kbd>N</kbd><span>Names</span> <kbd>H</kbd><span>Heatmap</span> <kbd>F</kbd><span>Fullscreen</span> <kbd>Esc</kbd><span>Close panels</span>
+      </div>
+    </aside>
+
+    <div id="toast"></div>
+    <script type="module" src="js/host.js"></script>
+  </body>
+</html>
